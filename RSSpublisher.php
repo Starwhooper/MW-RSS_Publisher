@@ -10,6 +10,8 @@ EOT;
 	exit( 1 );
 }
 
+$wgRSSpublisher['version'] = '1.0 beta build 20140916';
+
 $wgExtensionCredits['specialpage'][] = array(
 	'path'           => __FILE__,
 	'name'           => 'RSSpublisher',
@@ -17,8 +19,9 @@ $wgExtensionCredits['specialpage'][] = array(
 	'descriptionmsg' => 'rsspublisher-desc',
 	'author'         => '[http://www.mediawiki.org/wiki/User:Starwhooper Thiemo Schuff]',
 	'url'            => 'https://www.mediawiki.org/wiki/Extension:RSSpublisher',
-	'version'        => '0.3 beta build 20140906',
-	'license-name' => 'cc-by-sa-de 4.0'
+//	'version'        => '0.3 beta build 20140906',
+	'version'        => $wgRSSpublisher['version'],
+	'license-name' => 'cc-by-sa 4.0'
 );
 
 $dir = dirname(__FILE__) . '/';
@@ -27,6 +30,8 @@ $wgAutoloadClasses['SpecialRSSpublisher'] = $dir . 'SpecialRSSpublisher.php';
 $wgExtensionMessagesFiles['RSSpublisher'] = $dir . 'RSSpublisher.i18n.php';
 $wgSpecialPages['RSSpublisher'] = 'SpecialRSSpublisher';
 $wgSpecialPageGroups['RSSpublisher'] = 'other';
+
+
 
 $wgHooks['SkinBuildSidebar'][] = 'AddRSStoSidebar';
 

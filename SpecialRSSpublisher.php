@@ -11,7 +11,7 @@ class SpecialRSSpublisher extends SpecialPage {
 		global $wgArticlePath;
 		global $wgEmergencyContact;
 		global $wgLanguageCode;
-		global $wgLogo;
+		global $wgFavicon;
 		global $wgOut;
 		global $wgRSSpublisher;
 		global $wgRequest;
@@ -45,31 +45,31 @@ class SpecialRSSpublisher extends SpecialPage {
 		$dbr = wfGetDB( DB_SLAVE );
 		$res = $dbr->select('page', array('page_title','page_touched','page_id','page_latest'), $conditions, $fname = 'Database::select',$options);		
 		foreach($res as $row) {
-//			$pageurl = urlencode($row->page_title);
 			$items[$i]['title'] = str_replace('_', ' ',$row->page_title);
 			$items[$i]['link'] = $wgServer . str_replace('$1', urlencode($row->page_title), $wgArticlePath);
 			$items[$i]['pubdate'] = date($datetimeformat, strtotime($row->page_touched));
 			if ($row->page_touched > $biggest_page_touched) $biggest_page_touched = $row->page_touched;
-			$imageurl = chooseimagefromarticle($row->page_id);
-			$imageurl = str_replace($imageurl['file'],urlencode($imageurl['file']),$imageurl['path']); //<- Das muss noch gefixt werden !!!
-			if($imageurl != NULL) {
-				$items[$i]['imageurl'] = $wgServer . '/' . $imageurl;
-				$items[$i]['imagesize'] = filesize($imageurl);
-				$items[$i]['imagetype'] = image_type_to_mime_type(exif_imagetype($imageurl));
+			$imageinfo = chooseimagefromarticle($row->page_id);
+			if($imageinfo != NULL) {
+				$items[$i]['imageurl'] = $imageinfo['htmlurl'];
+				$items[$i]['imagesize'] = $imageinfo['size'];
+				$items[$i]['imagetype'] = $imageinfo['type'];
 				$items[$i]['description'] = wfMsg('rsspublisher-imagelicense');
 			}
 			$items[$i]['guid'] = $wgServer . str_replace('$1', urlencode($row->page_title), $wgArticlePath) . '&amp;oldid=' . $row->page_latest;
 			
 			$dbr_revision = wfGetDB( DB_SLAVE );
-			$res_revision = $dbr_revision->select('revision', array('rev_text_id'), array('rev_page = "'.$row->page_id.'"'), $fname = 'Database::select', array('LIMIT' => 1));		
+			$res_revision = $dbr_revision->select('revision', array('rev_text_id'), array('rev_page = "'.$row->page_id.'"'), $fname = 'Database::select', array('LIMIT' => 1, 'ORDER BY' => 'rev_timestamp DESC'));		
 
 			foreach($res_revision as $row_revision) {
 				$dbr_old_text = wfGetDB( DB_SLAVE );
 				$res_old_text = $dbr_old_text->select('text', array('old_text'), array('old_id = "'.$row_revision->rev_text_id.'"'), $fname = 'Database::select', array('LIMIT' => 1));		
-				
+
 				foreach($res_old_text as $row_old_text) {
 					$oldtext = $row_old_text->old_text;
-					if (strlen($oldtext) > 100) $items[$i]['description'] .= cleantext($oldtext,$items[$i]['title']);					
+					if (strlen($oldtext) > 100) {
+						$items[$i]['description'] .= ' '.cleantext($oldtext,$items[$i]['title']);					
+					}
 				}
 			}
 			$i++;
@@ -81,7 +81,7 @@ class SpecialRSSpublisher extends SpecialPage {
 		//OUTPUT
 		//header
 		header('Content-type: application/rss+xml');
-//		header('Content-Disposition: attachment; filename="thwiki.xml"');
+		header('Content-Disposition: attachment; filename="thwiki.xml"');
 		
 		echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
 		echo "<rss version=\"2.0\" xmlns:atom=\"http://www.w3.org/2005/Atom\">\n";
@@ -92,37 +92,30 @@ class SpecialRSSpublisher extends SpecialPage {
 		echo "\t<link>$wgServer</link>\n";
 		if (isset($wgRSSpublisher['pagedescription'])) echo "\t<description>".$wgRSSpublisher['pagedescription']."</description>\n";
 		echo "\t<language>$wgLanguageCode</language>\n";
-//		echo "\t<updatePeriod>hourly</updatePeriod>\n";
-//		echo "\t<updateFrequency>1</updateFrequency>\n";
 		echo "\t<copyright>$wgSitename</copyright>\n";
 		echo "\t<pubDate>".$channel['pubdate']."</pubDate>\n";
 		echo "\t<lastBuildDate>".date($datetimeformat)."</lastBuildDate>\n";
 		echo "\t<docs>http://thwiki.org/t=Special:RSSpublisher</docs>\n";
-		echo "\t<generator>Mediawiki RSS over all Extension Version 0.1 beta build 20140824</generator>\n";
+		echo "\t<generator>Mediawiki RSSpublicher Extrension ".$wgRSSpublisher['version']." from Thiemo Schuff</generator>\n";
 		echo "\t<managingEditor>$wgEmergencyContact($wgSitename)</managingEditor>\n";
 		echo "\t<webMaster>$wgEmergencyContact($wgSitename)</webMaster>\n";
-		echo "\t<image>\n\t\t<url>$wgServer$wgLogo</url>\n\t\t<title>$wgSitename</title>\n\t\t<link>$wgServer</link>\n\t</image>\n";
+		echo "\t<image>\n\t\t<url>$wgServer$wgFavicon</url>\n\t\t<title>$wgSitename</title>\n\t\t<link>$wgServer</link>\n\t</image>\n";
 		echo "\t<atom:link href=\"http://thwiki.org/t=Spezial:RSSpublisher\" rel=\"self\" type=\"application/rss+xml\" />\n";
 
 
 		foreach	($items as $item){
-			//item
 			echo "\t\t<item>\n";
 			echo "\t\t\t<title>".trim(wfMsg('rsspublisher-articleedit',$item['title']))."</title>\n";
 			echo "\t\t\t<link>".$item['link']."</link>\n";
-//			echo "\t\t\t<comments></comments>\n"; <- Add discussion link to article
-//			echo '<author>Autor des Artikels, E-Mail-Adresse</author>'."\n";
-			if (isset($item['imageurl'])) {
-				if ($item['imagesize'] >= 1) echo "\t\t\t<enclosure url=\"".$item['imageurl']."\" length=\"".$item['imagesize']."\" type=\"".$item['imagetype']."\" />\n";
-			}
+			if (isset($item['imageurl'])) echo "\t\t\t<enclosure url=\"".$item['imageurl']."\" length=\"".$item['imagesize']."\" type=\"".$item['imagetype']."\" />\n";
 			echo "\t\t\t<description><![CDATA[".trim($item['description'])."]]></description>\n";
 			echo "\t\t\t<pubDate>".$item['pubdate']."</pubDate>\n";
 			echo "\t\t\t<guid>".$item['guid']."</guid>\n";
 			
 			echo "\t\t</item>\n";
 		}
-		
-		//fooder
+
+		//footer
 		echo "\t</channel>\n</rss>\n";
 	}
 }
