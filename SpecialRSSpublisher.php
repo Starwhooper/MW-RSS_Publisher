@@ -1,6 +1,8 @@
 ﻿<?php
 include('chooseimagefromarticle.func.php');
 include('cleantext.func.php');
+include('collectarticelchanges.func.php');
+include('collectnewusers.func.php');
 
 class SpecialRSSpublisher extends SpecialPage {
 	function __construct() {
@@ -8,114 +10,96 @@ class SpecialRSSpublisher extends SpecialPage {
 	}
  
 	function execute( $par ) {
-		global $wgArticlePath;
 		global $wgEmergencyContact;
-		global $wgLanguageCode;
 		global $wgFavicon;
+		global $wgLanguageCode;
 		global $wgOut;
 		global $wgRSSpublisher;
-		global $wgRequest;
 		global $wgServer;
-		global $wgSitename; 
-		
+		global $wgSitename;
+
 		$this->setHeaders();
-		
 		$wgOut->disable();
-		
-		if (isset($wgRSSpublisher['namespaces'])){
-			$conditions = '(';
-			foreach($wgRSSpublisher['namespaces'] as $namespace) $conditions = 'page_namespace = '.$namespace.' or ';
-			$conditions = substr($conditions,0,-4);
-			$conditions = ')';
-		}
-		else $conditions = 'page_namespace = 0';
-		
-		if (!isset($wgRSSpublisher['showredirects']) or $wgRSSpublisher['showredirects'] == false) $conditions .= ' and page_is_redirect = 0';
-		
-		$options['ORDER BY'] = 'page_touched DESC';
-		if (isset($wgRSSpublisher['limit'])){
-			if ($wgRSSpublisher['limit'] == 'unlimited');
-			else $options['LIMIT'] = $wgRSSpublisher['limit'];
-		}
-		else $options['LIMIT'] = 30;
-		
-		$i = 0;
-		$datetimeformat = 'D, d M Y H:i:s O';
-		
-		$dbr = wfGetDB( DB_SLAVE );
-		$res = $dbr->select('page', array('page_title','page_touched','page_id','page_latest'), $conditions, $fname = 'Database::select',$options);		
-		foreach($res as $row) {
-			$items[$i]['title'] = str_replace('_', ' ',$row->page_title);
-			$items[$i]['link'] = $wgServer . str_replace('$1', urlencode($row->page_title), $wgArticlePath);
-			$items[$i]['pubdate'] = date($datetimeformat, strtotime($row->page_touched));
-			if ($row->page_touched > $biggest_page_touched) $biggest_page_touched = $row->page_touched;
-			$imageinfo = chooseimagefromarticle($row->page_id);
-			if($imageinfo != NULL) {
-				$items[$i]['imageurl'] = $imageinfo['htmlurl'];
-				$items[$i]['imagesize'] = $imageinfo['size'];
-				$items[$i]['imagetype'] = $imageinfo['type'];
-				$items[$i]['description'] = wfMsg('rsspublisher-imagelicense');
-			}
-			$items[$i]['guid'] = $wgServer . str_replace('$1', urlencode($row->page_title), $wgArticlePath) . '&amp;oldid=' . $row->page_latest;
-			
-			$dbr_revision = wfGetDB( DB_SLAVE );
-			$res_revision = $dbr_revision->select('revision', array('rev_text_id'), array('rev_page = "'.$row->page_id.'"'), $fname = 'Database::select', array('LIMIT' => 1, 'ORDER BY' => 'rev_timestamp DESC'));		
 
-			foreach($res_revision as $row_revision) {
-				$dbr_old_text = wfGetDB( DB_SLAVE );
-				$res_old_text = $dbr_old_text->select('text', array('old_text'), array('old_id = "'.$row_revision->rev_text_id.'"'), $fname = 'Database::select', array('LIMIT' => 1));		
-
-				foreach($res_old_text as $row_old_text) {
-					$oldtext = $row_old_text->old_text;
-					if (strlen($oldtext) > 100) {
-						$items[$i]['description'] .= ' '.cleantext($oldtext,$items[$i]['title']);					
-					}
-				}
-			}
-			$i++;
-		}
-		
-		$channel['pubdate'] = date($datetimeformat, strtotime($biggest_page_touched));
-		
-			
-		//OUTPUT
 		//header
 		header('Content-type: application/rss+xml');
-		header('Content-Disposition: attachment; filename="thwiki.xml"');
-		
-		echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-		echo "<rss version=\"2.0\" xmlns:atom=\"http://www.w3.org/2005/Atom\">\n";
-		
-		//Channel Information
-		echo "<channel>\n";
-		echo "\t<title>$wgSitename</title>\n";
-		echo "\t<link>$wgServer</link>\n";
-		if (isset($wgRSSpublisher['pagedescription'])) echo "\t<description>".$wgRSSpublisher['pagedescription']."</description>\n";
-		echo "\t<language>$wgLanguageCode</language>\n";
-		echo "\t<copyright>$wgSitename</copyright>\n";
-		echo "\t<pubDate>".$channel['pubdate']."</pubDate>\n";
-		echo "\t<lastBuildDate>".date($datetimeformat)."</lastBuildDate>\n";
-		echo "\t<docs>http://thwiki.org/t=Special:RSSpublisher</docs>\n";
-		echo "\t<generator>Mediawiki RSSpublicher Extrension ".$wgRSSpublisher['version']." from Thiemo Schuff</generator>\n";
-		echo "\t<managingEditor>$wgEmergencyContact($wgSitename)</managingEditor>\n";
-		echo "\t<webMaster>$wgEmergencyContact($wgSitename)</webMaster>\n";
-		echo "\t<image>\n\t\t<url>$wgServer$wgFavicon</url>\n\t\t<title>$wgSitename</title>\n\t\t<link>$wgServer</link>\n\t</image>\n";
-		echo "\t<atom:link href=\"http://thwiki.org/t=Spezial:RSSpublisher\" rel=\"self\" type=\"application/rss+xml\" />\n";
 
+		$output = NULL;
+		
 
-		foreach	($items as $item){
-			echo "\t\t<item>\n";
-			echo "\t\t\t<title>".trim(wfMsg('rsspublisher-articleedit',$item['title']))."</title>\n";
-			echo "\t\t\t<link>".$item['link']."</link>\n";
-			if (isset($item['imageurl'])) echo "\t\t\t<enclosure url=\"".$item['imageurl']."\" length=\"".$item['imagesize']."\" type=\"".$item['imagetype']."\" />\n";
-			echo "\t\t\t<description><![CDATA[".trim($item['description'])."]]></description>\n";
-			echo "\t\t\t<pubDate>".$item['pubdate']."</pubDate>\n";
-			echo "\t\t\t<guid>".$item['guid']."</guid>\n";
-			
-			echo "\t\t</item>\n";
+		//check if file is already in cache	and not to old
+		if(isset($wgRSSpublisher['maxcacheage'])) $maxcacheage = $wgRSSpublisher['maxcacheage'];
+		else $maxcacheage = 60*60;
+		
+		if(time() - filemtime('cache/rsspublisher.txt') <= $maxcacheage) {
+			$output .= implode('',file('cache/rsspublisher.txt'));
 		}
+		//in case of not in cache
+		else{
+	
+			$datetimeformat = 'D, d M Y H:i:s O';
 
-		//footer
-		echo "\t</channel>\n</rss>\n";
+			if (isset($wgRSSpublisher['limit'])){
+				if ($wgRSSpublisher['limit'] == 'unlimited');
+				else $itemlimit = $wgRSSpublisher['limit'];
+			}
+			else $itemlimit = 30;
+			
+			
+			foreach(collectarticlechanges() as $additem) $items[] = $additem;
+			foreach(collectnewusers() as $additem) $items[] = $additem;
+
+			foreach($items as $item) $sortitems[$item['unixpubdate']] = $item;
+			krsort($sortitems);
+
+			$sortitems = array_slice($sortitems, 0, $itemlimit);
+			
+			$channel['pubdate'] = date($datetimeformat, max(array_keys($sortitems)));
+
+			//OUTPUT
+			$output .= "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+			$output .= "<rss version=\"2.0\" xmlns:atom=\"http://www.w3.org/2005/Atom\">\n";
+			
+			//Channel Information
+			$output .= "<channel>\n";
+			$output .= "\t<title>$wgSitename</title>\n";
+			$output .= "\t<link>$wgServer</link>\n";
+			if (isset($wgRSSpublisher['pagedescription'])) $output .= "\t<description>".$wgRSSpublisher['pagedescription']."</description>\n";
+			$output .= "\t<language>$wgLanguageCode</language>\n";
+			$output .= "\t<copyright>$wgSitename</copyright>\n";
+			$output .= "\t<pubDate>".$channel['pubdate']."</pubDate>\n";
+			$output .= "\t<lastBuildDate>".date($datetimeformat)."</lastBuildDate>\n";
+			$output .= "\t<docs>http://thwiki.org/t=Special:RSSpublisher</docs>\n";
+			$output .= "\t<generator>Mediawiki RSSpublicher Extrension ".$wgRSSpublisher['version']." from Thiemo Schuff</generator>\n";
+			$output .= "\t<managingEditor>$wgEmergencyContact($wgSitename)</managingEditor>\n";
+			$output .= "\t<webMaster>$wgEmergencyContact($wgSitename)</webMaster>\n";
+			$output .= "\t<image>\n\t\t<url>$wgServer$wgFavicon</url>\n\t\t<title>$wgSitename</title>\n\t\t<link>$wgServer</link>\n\t</image>\n";
+			$output .= "\t<atom:link href=\"http://thwiki.org/t=Spezial:RSSpublisher\" rel=\"self\" type=\"application/rss+xml\" />\n";
+
+			//Items
+			foreach	($sortitems as $item){
+				$output .= "\t\t<item>\n";
+				
+				if ($item['type'] == 'collectarticelchanges') $output .= "\t\t\t<title>".trim(wfMsg('rsspublisher-articleedit',$item['title']))."</title>\n";
+				elseif ($item['type'] == 'collectnewusers') $output .= "\t\t\t<title>".trim(wfMsg('rsspublisher-newusers',$item['title']))."</title>\n";
+				else $output .= "\t\t\t<title>".$item['title']."</title>\n";
+				
+				$output .= "\t\t\t<link>".$item['link']."</link>\n";
+				if (isset($item['imageurl'])) $output .= "\t\t\t<enclosure url=\"".$item['imageurl']."\" length=\"".$item['imagesize']."\" type=\"".$item['imagetype']."\" />\n";
+				$output .= "\t\t\t<description><![CDATA[".trim($item['description'])."]]></description>\n";
+				$output .= "\t\t\t<pubDate>".$item['pubdate']."</pubDate>\n";
+				$output .= "\t\t\t<guid>".$item['guid']."</guid>\n";
+				$output .= "\t\t</item>\n";
+			}
+
+			//footer
+			$output .= "\t</channel>\n</rss>\n";
+			
+			$cachefile = fopen('cache/rsspublisher.txt','w');
+/			fwrite($cachefile, $output);
+			fclose($cachefile);
+
+		}
+		echo $output;
 	}
 }

@@ -10,16 +10,14 @@ EOT;
 	exit( 1 );
 }
 
-$wgRSSpublisher['version'] = '1.0 beta build 20140916';
+$wgRSSpublisher['version'] = '1.4 build 20150818';
 
 $wgExtensionCredits['specialpage'][] = array(
 	'path'           => __FILE__,
 	'name'           => 'RSSpublisher',
-//	'description'    => 'Send e-mail over Mobile-Upload by new articelversions to Facebook, to post a new text and picture on the wall',
 	'descriptionmsg' => 'rsspublisher-desc',
 	'author'         => '[http://www.mediawiki.org/wiki/User:Starwhooper Thiemo Schuff]',
 	'url'            => 'https://www.mediawiki.org/wiki/Extension:RSSpublisher',
-//	'version'        => '0.3 beta build 20140906',
 	'version'        => $wgRSSpublisher['version'],
 	'license-name' => 'cc-by-sa 4.0'
 );
@@ -41,6 +39,6 @@ function AddRSStoSidebar( $skin, &$bar ) {
 	global $wgRSSpublisher;
 	global $wgServer;
 	if (!isset($wgRSSpublisher['showatsidebarnavigation']) or $wgRSSpublisher['showatsidebarnavigation'] == true) $bar['Navigation'][] = array('text' => "RSS", 'href' => "t=Special:RSSpublisher");	
-	if (!isset($wgRSSpublisher['showatsidebarrss']) or $wgRSSpublisher['showatsidebarrss'] == true); $bar['RSS'] = '<a href="'.$wgServer.'/t=Special:RSSpublisher"><img src="http://www.w3schools.com/rss/rss.gif" width="36" height="14" alt="RSS"></a>';
+	if (!isset($wgRSSpublisher['showatsidebarrss']) or $wgRSSpublisher['showatsidebarrss'] == true) $bar['RSS'] = '<a href="'.$wgServer.'/t=Special:RSSpublisher"><div style="font-weight: bold;font-size:0.75em;font-family:sans-serif; color: #fff; background-color: #f60; padding: 0.2em 0.35em; float: left; text-decoration: none; border: solid 2px; border-color: #f80 #960 #960 #f80;">RSS</div></a>';
     return true;
 }

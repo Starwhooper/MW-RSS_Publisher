@@ -39,19 +39,17 @@ function chooseimagefromarticle($pageid){
 
 //CHECK IF IMAGE EXIST AND IF IT COMES FROM LOCAL OR OTHERWISE FROM MEDIAWIKI COMMONS. IF NO IMAGE EXIST, IT WILL CHOOSE THE DEFAULT IMAGE
 	if ($orgfilename != NULL){
-		$res = $dbr->select('image', array('img_name'), 'img_name = "'.$orgfilename.'"', $fname = 'Database::select',array('LIMIT' => '1'));
-		foreach($res as $row) $imageinfo['url'] = $wgServer.'/thumb.php?f='.$orgfilename.'&w='.$wgRSSpublisher['imagewidth'];
-		if (!isset($imageinfo)) $imageinfo['url'] = 'http://commons.wikimedia.org/w/thumb.php?f='.$orgfilename.'&w='.$wgRSSpublisher['imagewidth'];
+		$res = $dbr->select('image', array('img_name'), 'img_name = "'.$orgfilename.'"' , $fname = 'DatabaseBase::select',array());
+		if($res->result->num_rows > 0) $imageinfo = array('url' => $wgServer.'/thumb.php?f='.$orgfilename.'&w='.$wgRSSpublisher['imagewidth'], 'htmlurl' => $wgServer.'/thumb.php?f='.rawurlencode($orgfilename).'&amp;w='.$wgRSSpublisher['imagewidth']);
+		else $imageinfo = array('url' => 'http://commons.wikimedia.org/w/thumb.php?f='.$orgfilename.'&w='.$wgRSSpublisher['imagewidth'], 'htmlurl' => 'http://commons.wikimedia.org/w/thumb.php?f='.rawurlencode ($orgfilename).'&amp;w='.$wgRSSpublisher['imagewidth']);
 		$image['file'] = $orgfilename;
+		
 	}
 	else $imageinfo = array('url' => $wgRSSpublisher['defaultpic'], 'file' => substr($wgRSSpublisher['defaultpic'],strrpos($wgRSSpublisher['defaultpic'],'/')+1));
 
-//GET URL IN HTML FORM
-	$imageinfo['htmlurl'] = htmlspecialchars($imageinfo['url']);
-	
 //GET SIZE OF IMAGE
 	$head = array_change_key_case(get_headers($imageinfo['url'], TRUE));
-	$imageinfo['size'] = $head['content-length'];
+	$imageinfo['size'] = $head['content-length'][count($head['content-length']) - 1];
 
 //GET IMAGETYPE
 	$imageinfo['type'] = image_type_to_mime_type(exif_imagetype($imageinfo['url']));	
